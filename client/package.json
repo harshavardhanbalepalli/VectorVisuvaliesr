@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "parcel src/index.html",
-    "build": "parcel build src/index.html",
+    "build": "npx parcel build src/index.html",
     "server": "node server.js",
     "client": "cd client && npx parcel src/index.html",
     "dev": "concurrently \"npm run server\" \"npm run client\""
@@ -14,6 +14,7 @@
     "react-router-dom": "^6.30.3"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0"
+    "concurrently": "^8.2.0",
+    "parcel": "^2.16.4"
   }
 }
