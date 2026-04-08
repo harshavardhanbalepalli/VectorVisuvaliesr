@@ -1,0 +1,18 @@
+{
+  "name": "vector-visualizer",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "parcel src/index.html",
+    "server": "node server.js",
+    "client": "cd client && npx parcel src/index.html",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "react-router-dom": "^6.30.3"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
