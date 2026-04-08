@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import VectorCanvas from "./VectorCanvas";
 
-const API = "http://localhost:4000";
+const API = "https://vectorvisualiser.onrender.com";
 
 export default function FieldPage({ type, accent, accentClass, tag, title, desc, formula }) {
   const [functions, setFunctions]   = useState([]);
