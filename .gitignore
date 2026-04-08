@@ -1,5 +1,12 @@
 node_modules
 client/node_modules
-dist
+
 .parcel-cache
+client/.parcel-cache
+
+dist
+client/dist
+
 .env
+.DS_Store
+mnt
