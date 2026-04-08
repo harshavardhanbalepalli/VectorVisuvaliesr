@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "parcel src/index.html",
+    "build": "parcel build src/index.html",
     "server": "node server.js",
     "client": "cd client && npx parcel src/index.html",
     "dev": "concurrently \"npm run server\" \"npm run client\""
