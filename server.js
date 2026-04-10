@@ -51,30 +51,45 @@ function numericalGradient(expr, x, y) {
   };
 }
 
-function numericalPartials(fx, fy, x, y) {
-  const h = 1e-5;
+/* ───────────── PREDEFINED FUNCTIONS ───────────── */
 
-  const fx1 = safeEval(fx, x + h, y);
-  const fx2 = safeEval(fx, x - h, y);
-  const fx3 = safeEval(fx, x, y + h);
-  const fx4 = safeEval(fx, x, y - h);
+const FUNCTIONS = {
+  gradient: {
+    quadratic: {
+      label: "f = x² + y²",
+      fn: (x,y) => ({ vx: 2*x, vy: 2*y }),
+      diff: {
+        form: "∇f = (∂f/∂x, ∂f/∂y)",
+        result: "(2x, 2y)",
+        steps: ["∂f/∂x = 2x", "∂f/∂y = 2y"]
+      }
+    }
+  },
 
-  const fy1 = safeEval(fy, x + h, y);
-  const fy2 = safeEval(fy, x - h, y);
-  const fy3 = safeEval(fy, x, y + h);
-  const fy4 = safeEval(fy, x, y - h);
+  curl: {
+    rotation: {
+      label: "F = (-y, x)",
+      fn: (x,y) => ({ vx: -y, vy: x }),
+      diff: {
+        form: "curl(F) = ∂Fy/∂x − ∂Fx/∂y",
+        result: "2",
+        steps: ["∂Fy/∂x = 1", "∂Fx/∂y = -1"]
+      }
+    }
+  },
 
-  if ([fx1, fx2, fx3, fx4, fy1, fy2, fy3, fy4].includes(null)) {
-    return null;
+  divergence: {
+    source: {
+      label: "F = (x, y)",
+      fn: (x,y) => ({ vx: x, vy: y }),
+      diff: {
+        form: "div(F) = ∂Fx/∂x + ∂Fy/∂y",
+        result: "2",
+        steps: ["∂Fx/∂x = 1", "∂Fy/∂y = 1"]
+      }
+    }
   }
-
-  return {
-    dFx_dx: (fx1 - fx2) / (2 * h),
-    dFx_dy: (fx3 - fx4) / (2 * h),
-    dFy_dx: (fy1 - fy2) / (2 * h),
-    dFy_dy: (fy3 - fy4) / (2 * h),
-  };
-}
+};
 
 /* ───────────── GRID ───────────── */
 
@@ -96,6 +111,24 @@ function makeGrid({ xMin=-4, xMax=4, yMin=-4, yMax=4 }) {
 
 /* ───────────── GENERATORS ───────────── */
 
+function generatePredefined(type, key, opts) {
+  const entry = FUNCTIONS[type]?.[key];
+  if (!entry) return null;
+
+  const data = [];
+
+  for (const [x, y] of makeGrid(opts)) {
+    const { vx, vy } = entry.fn(x, y);
+    data.push({ x, y, vx, vy });
+  }
+
+  return {
+    label: entry.label,
+    data,
+    diff: entry.diff
+  };
+}
+
 function generateCustom(type, exprs, opts) {
   const data = [];
 
@@ -111,17 +144,9 @@ function generateCustom(type, exprs, opts) {
       vy = safeEval(exprs.fy, x, y);
     }
 
-    if (
-      vx === null || vy === null ||
-      isNaN(vx) || isNaN(vy)
-    ) continue;
+    if (vx === null || vy === null || isNaN(vx) || isNaN(vy)) continue;
 
-    data.push({
-      x: +x.toFixed(3),
-      y: +y.toFixed(3),
-      vx: +vx.toFixed(4),
-      vy: +vy.toFixed(4),
-    });
+    data.push({ x, y, vx, vy });
   }
 
   return data;
@@ -129,56 +154,54 @@ function generateCustom(type, exprs, opts) {
 
 /* ───────────── ROUTES ───────────── */
 
-app.get("/api/functions", (req, res) => {
-  res.json({
-    gradient: [{ key: "custom", label: "Custom Gradient" }],
-    curl: [{ key: "custom", label: "Custom Curl" }],
-    divergence: [{ key: "custom", label: "Custom Divergence" }],
-  });
+app.get("/", (req, res) => {
+  res.send("API running 🚀");
 });
 
-["gradient", "curl", "divergence"].forEach((type) => {
+app.get("/api/functions", (req, res) => {
+  const out = {};
+  for (const [type, fns] of Object.entries(FUNCTIONS)) {
+    out[type] = Object.entries(fns).map(([k,v]) => ({
+      key: k,
+      label: v.label
+    }));
+  }
+  res.json(out);
+});
+
+["gradient","curl","divergence"].forEach((type) => {
   app.post(`/api/${type}`, (req, res) => {
-    try {
-      const { custom, exprs, xMin, xMax, yMin, yMax } = req.body;
+    const { func, custom, exprs, xMin, xMax, yMin, yMax } = req.body;
 
-      if (!custom || !exprs) {
-        return res.status(400).json({ error: "Invalid request" });
-      }
+    const opts = { xMin, xMax, yMin, yMax };
 
-      if (type === "gradient" && !exprs.f) {
-        return res.status(400).json({ error: "Missing f(x,y)" });
-      }
-
-      if (type !== "gradient" && (!exprs.fx || !exprs.fy)) {
-        return res.status(400).json({ error: "Missing Fx or Fy" });
-      }
-
-      const data = generateCustom(type, exprs, {
-        xMin, xMax, yMin, yMax,
-      });
+    if (custom) {
+      const data = generateCustom(type, exprs, opts);
 
       if (!data.length) {
-        return res.status(400).json({
-          error: "Invalid expression — no valid points generated"
-        });
+        return res.status(400).json({ error: "Invalid expression" });
       }
 
       return res.json({
         type,
         func: "custom",
-        label:
-          type === "gradient"
-            ? `f = ${exprs.f}`
-            : `F = (${exprs.fx}, ${exprs.fy})`,
-        custom: true,
-        data,
+        label: "Custom",
+        data
       });
-
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Server error" });
     }
+
+    const result = generatePredefined(type, func, opts);
+    if (!result) {
+      return res.status(400).json({ error: "Unknown function" });
+    }
+
+    res.json({
+      type,
+      func,
+      label: result.label,
+      data: result.data,
+      diff: result.diff
+    });
   });
 });
 
