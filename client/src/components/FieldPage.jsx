@@ -4,12 +4,13 @@ import VectorCanvas from "./VectorCanvas";
 const API = "https://vectorvisuvaliesr-5.onrender.com";
 
 export default function FieldPage({ type, accent, accentClass, tag, title, desc, formula }) {
-  const [functions, setFunctions]   = useState([]);
+  const [functions, setFunctions]     = useState([]);
   const [selectedKey, setSelectedKey] = useState(null);
-  const [data, setData]             = useState([]);
-  const [label, setLabel]           = useState("");
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState(null);
+  const [data, setData]               = useState([]);
+  const [label, setLabel]             = useState("");
+  const [diff, setDiff]               = useState(null);   // ← differential form
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState(null);
 
   // Range
   const [xMin, setXMin] = useState(-4);
@@ -24,7 +25,6 @@ export default function FieldPage({ type, accent, accentClass, tag, title, desc,
   const [exprFy, setExprFy]           = useState("x");
   const [customError, setCustomError] = useState("");
 
-  // Load function list
   useEffect(() => {
     fetch(`${API}/api/functions`)
       .then(r => r.json())
@@ -36,7 +36,6 @@ export default function FieldPage({ type, accent, accentClass, tag, title, desc,
       .catch(() => setError("Cannot connect to backend — make sure server.js is running on port 4000"));
   }, [type]);
 
-  // Auto-fetch predefined on selection
   useEffect(() => {
     if (selectedKey && !customMode) fetchPredefined(selectedKey);
   }, [selectedKey]);
@@ -53,14 +52,16 @@ export default function FieldPage({ type, accent, accentClass, tag, title, desc,
       });
       const json = await res.json();
       if (json.error) { setError(json.error); return; }
-      setData(json.data || []); setLabel(json.label || key);
+      setData(json.data || []);
+      setLabel(json.label || key);
+      setDiff(json.diff || null);
     } catch { setError("Fetch failed — is the backend running?"); }
     finally   { setLoading(false); }
   };
 
   const fetchCustom = async () => {
     setCustomError("");
-    if (type === "gradient" && !exprF.trim())       { setCustomError("Enter f(x,y)"); return; }
+    if (type === "gradient" && !exprF.trim())                       { setCustomError("Enter f(x,y)"); return; }
     if (type !== "gradient" && (!exprFx.trim() || !exprFy.trim())) { setCustomError("Enter both Fx and Fy"); return; }
 
     const exprs = type === "gradient" ? { f: exprF } : { fx: exprFx, fy: exprFy };
@@ -73,13 +74,14 @@ export default function FieldPage({ type, accent, accentClass, tag, title, desc,
       });
       const json = await res.json();
       if (json.error) { setCustomError(json.error); return; }
-      setData(json.data || []); setLabel(json.label || "Custom");
+      setData(json.data || []);
+      setLabel(json.label || "Custom");
+      setDiff(json.diff || null);
     } catch { setCustomError("Fetch failed — is the backend running?"); }
     finally   { setLoading(false); }
   };
 
   const handleVisualize = () => customMode ? fetchCustom() : fetchPredefined(selectedKey);
-
   const preview = data.slice(0, 6);
 
   return (
@@ -96,7 +98,7 @@ export default function FieldPage({ type, accent, accentClass, tag, title, desc,
         {/* ── Controls ── */}
         <div className="control-panel">
 
-          {/* Mode */}
+          {/* Mode toggle */}
           <div>
             <div className="panel-section-title">Mode</div>
             <div className="mode-toggle">
@@ -141,34 +143,26 @@ export default function FieldPage({ type, accent, accentClass, tag, title, desc,
                   <div className="input-group">
                     <label className="input-label">f(x, y) =</label>
                     <input
-                      className="fn-input"
-                      type="text"
-                      value={exprF}
+                      className="fn-input" type="text" value={exprF}
                       onChange={e => setExprF(e.target.value)}
                       placeholder="x*x + sin(y)"
                       style={{ borderColor: accent + "44" }}
                     />
-                    <div className="input-hint">Gradient is computed numerically (finite difference)</div>
+                    <div className="input-hint">Gradient computed via finite difference</div>
                   </div>
                 ) : (
                   <>
                     <div className="input-group">
                       <label className="input-label">Fx(x, y) =</label>
-                      <input
-                        className="fn-input" type="text" value={exprFx}
-                        onChange={e => setExprFx(e.target.value)}
-                        placeholder="-y * cos(x)"
-                        style={{ borderColor: accent + "44" }}
-                      />
+                      <input className="fn-input" type="text" value={exprFx}
+                        onChange={e => setExprFx(e.target.value)} placeholder="-y * cos(x)"
+                        style={{ borderColor: accent + "44" }} />
                     </div>
                     <div className="input-group">
                       <label className="input-label">Fy(x, y) =</label>
-                      <input
-                        className="fn-input" type="text" value={exprFy}
-                        onChange={e => setExprFy(e.target.value)}
-                        placeholder="x * sin(y)"
-                        style={{ borderColor: accent + "44" }}
-                      />
+                      <input className="fn-input" type="text" value={exprFy}
+                        onChange={e => setExprFy(e.target.value)} placeholder="x * sin(y)"
+                        style={{ borderColor: accent + "44" }} />
                     </div>
                   </>
                 )}
@@ -192,16 +186,13 @@ export default function FieldPage({ type, accent, accentClass, tag, title, desc,
               ].map(([lbl, val, setter]) => (
                 <div className="input-group" key={lbl}>
                   <label className="input-label">{lbl}</label>
-                  <input
-                    className="range-input" type="number" value={val} step="0.5"
-                    onChange={e => setter(parseFloat(e.target.value))}
-                  />
+                  <input className="range-input" type="number" value={val} step="0.5"
+                    onChange={e => setter(parseFloat(e.target.value))} />
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Active label */}
           {label && (
             <div>
               <div className="panel-section-title">Active Function</div>
@@ -236,33 +227,73 @@ export default function FieldPage({ type, accent, accentClass, tag, title, desc,
           )}
         </div>
 
-        {/* ── Canvas ── */}
-        <div className="canvas-wrap">
-          <div className="canvas-topbar">
-            <span className="canvas-label">
-              {data.length > 0 ? `${data.length} vectors rendered` : "Awaiting data…"}
-            </span>
-            <div className="canvas-legend">
-              <div className="legend-item">
-                <div className="legend-swatch" style={{ background: "rgba(20,30,80,0.9)" }} />
-                low magnitude
-              </div>
-              <div className="legend-item">
-                <div className="legend-swatch" style={{ background: accent }} />
-                high magnitude
+        {/* ── Right column: Canvas + Diff box ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+          {/* Canvas */}
+          <div className="canvas-wrap">
+            <div className="canvas-topbar">
+              <span className="canvas-label">
+                {data.length > 0 ? `${data.length} vectors rendered` : "Awaiting data…"}
+              </span>
+              <div className="canvas-legend">
+                <div className="legend-item">
+                  <div className="legend-swatch" style={{ background: "rgba(20,30,80,0.9)" }} />
+                  low magnitude
+                </div>
+                <div className="legend-item">
+                  <div className="legend-swatch" style={{ background: accent }} />
+                  high magnitude
+                </div>
               </div>
             </div>
+
+            {loading ? (
+              <div className="canvas-placeholder" style={{ color: accent }}>
+                <div className="spinner" /> Computing field…
+              </div>
+            ) : data.length === 0 ? (
+              <div className="canvas-placeholder">Select a function and click Visualize</div>
+            ) : (
+              <VectorCanvas data={data} accent={accent} width={700} height={540} />
+            )}
           </div>
 
-          {loading ? (
-            <div className="canvas-placeholder" style={{ color: accent }}>
-              <div className="spinner" /> Computing field…
+          {/* ── Differential Form Output Box ── */}
+          {diff && (
+            <div className="diff-box" style={{ borderColor: accent + "55" }}>
+              <div className="diff-box-header" style={{ color: accent }}>
+                <span className="diff-icon">∂</span>
+                Differential Form
+              </div>
+
+              {/* Operator form */}
+              <div className="diff-section">
+                <div className="diff-label">Operator</div>
+                <div className="diff-operator" style={{ color: accent }}>{diff.form}</div>
+              </div>
+
+              {/* Result */}
+              <div className="diff-section">
+                <div className="diff-label">Result</div>
+                <div className="diff-result">{diff.result}</div>
+              </div>
+
+              {/* Step-by-step */}
+              <div className="diff-section">
+                <div className="diff-label">Derivation Steps</div>
+                <div className="diff-steps">
+                  {diff.steps.map((step, i) => (
+                    <div key={i} className="diff-step">
+                      <span className="diff-step-num" style={{ color: accent }}>{i + 1}</span>
+                      <span className="diff-step-text">{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          ) : data.length === 0 ? (
-            <div className="canvas-placeholder">Select a function and click Visualize</div>
-          ) : (
-            <VectorCanvas data={data} accent={accent} width={700} height={540} />
           )}
+
         </div>
       </div>
     </div>
