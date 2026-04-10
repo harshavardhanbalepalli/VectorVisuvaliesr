@@ -7,8 +7,8 @@ An interactive full-stack web application to visualize **Gradient, Curl, and Div
 ## 🌐 Live Demo
 
 *(Add after deployment)*
-Frontend: https://your-vercel-url
-Backend: https://your-render-url
+Frontend: https://vectorvisuvaliesr-6.onrender.com/gradient
+Backend: https://vectorvisuvaliesr-5.onrender.com
 
 ---
 
